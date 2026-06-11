@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>终极测试</title>
+</head>
+<body>
+    <h1>测试 Supabase 连接</h1>
+    <div id="result" style="font-size:20px;">检测中...</div>
+
+    <script type="module">
+        import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+        
+        const SUPABASE_URL = 'https://jqubxwcjupapeaknfzpi.supabase.co';
+        const SUPABASE_KEY = 'sb_publishable_MndnE02o-5Q5xN7_rNyIhQ_1Ur7k8cq';
+        
+        const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+        
+        document.getElementById('result').innerHTML = 
+            '✅ Supabase 客户端创建成功！<br>' + 
+            '对象类型：' + typeof supabase;
+        
+        console.log('supabase:', supabase);
+    </script>
+</body>
+</html>

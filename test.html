@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>数据库连接测试</title>
+  <style>
+    body {
+      font-family: -apple-system, sans-serif;
+      max-width: 600px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .card {
+      background: white;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    }
+    h1 { color: #2d6a4f; }
+    button {
+      background: #2d6a4f;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+      margin: 5px;
+    }
+    button:hover { background: #1b4332; }
+    #result {
+      margin-top: 20px;
+      padding: 15px;
+      background: #f0f0f0;
+      border-radius: 8px;
+      white-space: pre-wrap;
+      font-family: monospace;
+      font-size: 14px;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    .success { color: #2d6a4f; font-weight: bold; }
+    .error { color: #d62828; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>🧪 Supabase 连接测试</h1>
+    <p>点下面按钮测试数据库</p>
+    <button onclick="testConnection()">测试连接</button>
+    <button onclick="testQuery()">读取观察记录</button>
+    <button onclick="testInsert()">写入测试数据</button>
+    <div id="result">等待测试...</div>
+  </div>
+
+  <!-- Supabase SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase.js"></script>
+
+  <script>
+    const resultDiv = document.getElementById('result');
+
+    function testConnection() {
+      if (window.supabaseClient) {
+        resultDiv.innerHTML = '<span class="success">✅ Supabase 客户端已加载！</span>\n\n' +
+          'URL: ' + window.supabaseClient.supabaseUrl;
+      } else {
+        resultDiv.innerHTML = '<span class="error">❌ 客户端未加载，检查 supabase.js</span>';
+      }
+    }
+
+    async function testQuery() {
+      resultDiv.textContent = '⏳ 正在查询...';
+      try {
+        const { data, error } = await window.supabaseClient
+          .from('observations')
+          .select('*')
+          .limit(5);
+
+        if (error) {
+          resultDiv.innerHTML = '<span class="error">❌ 查询失败：</span>\n' + error.message;
+          return;
+        }
+
+        resultDiv.innerHTML = '<span class="success">✅ 查询成功！</span>\n\n' +
+          '记录数：' + data.length + '\n\n' +
+          JSON.stringify(data, null, 2);
+      } catch (err) {
+        resultDiv.innerHTML = '<span class="error">❌ 错误：</span>\n' + err.message;
+      }
+    }
+
+    async function testInsert() {
+      resultDiv.textContent = '⏳ 正在写入...';
+      try {
+        const { data, error } = await window.supabaseClient
+          .from('observations')
+          .insert([
+            {
+              photo_url: 'https://example.com/test.jpg',
+              description: '这是一条测试观察记录：草原长势良好',
+              ai_suggestion: '建议继续保持当前放牧强度',
+              latitude: 43.8256,
+              longitude: 87.6168
+            }
+          ])
+          .select();
+
+        if (error) {
+          resultDiv.innerHTML = '<span class="error">❌ 写入失败：</span>\n' + error.message;
+          return;
+        }
+
+        resultDiv.innerHTML = '<span class="success">✅ 写入成功！</span>\n\n' +
+          '新记录：\n' + JSON.stringify(data, null, 2);
+      } catch (err) {
+        resultDiv.innerHTML = '<span class="error">❌ 错误：</span>\n' + err.message;
+      }
+    }
+  </script>
+</body>
+</html>
