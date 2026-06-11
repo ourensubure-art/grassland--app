@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>草原AI协作平台</title>
   <style>
+    
     :root {
       --bg: #faf7f2;
       --green: #16a34a;
@@ -181,6 +182,7 @@
       .temp { font-size: 54px; }
     }
   </style>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
   <main id="appContent">
@@ -204,6 +206,9 @@
   <script>
     const QWEATHER_HOST = "me6vhh6cn3.re.qweatherapi.com";
     const QWEATHER_KEY = "d620828c05bd441c9c516a5badb85866";
+    const SUPABASE_URL = 'https://jqubxwcjupapeaknfzpi.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_MndnE02o-5Q5xN7_rNyIhQ_1Ur7k8cq';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
     const $ = (sel) => document.querySelector(sel);
     const pages = ["weather", "tasks", "livestock", "observe", "profile"];
     const modal = $("#appModal");
@@ -428,20 +433,105 @@
     function openLivestockForm(id=""){ const data=livestock(), g=data.find(x=>x.id===id)||{category:"山羊",name:"",count:"",unit:"只",health:"健康",note:""}; openModal(`<h2>${id?"编辑":"添加"}牲畜群组</h2>${field("群组名称","lg-name",g.name)}${field("数量","lg-count",g.count,"number")}<div class="field"><span class="field-title">大类</span><div class="choices">${cats.map(c=>choice("lg-cat",c,g.category)).join("")}</div></div><div class="field"><span class="field-title">单位</span><div class="choices">${["只","对","头"].map(u=>choice("lg-unit",u,g.unit)).join("")}</div></div><div class="field"><span class="field-title">健康</span><div class="choices">${["健康","观察中","患病"].map(h=>choice("lg-health",h,g.health)).join("")}</div></div>${area("备注","lg-note",g.note)}<div class="modal-actions"><button class="secondary" onclick="closeModal()">取消</button><button class="primary" onclick="saveLivestockForm('${id}')">保存</button></div>`); bindChoices(); }
     function saveLivestockForm(id){ const data=livestock(), g={id:id||String(Date.now()),category:selected("lg-cat"),name:$("#lg-name").value.trim(),count:Number($("#lg-count").value),unit:selected("lg-unit"),health:selected("lg-health"),note:$("#lg-note").value.trim(),createdAt:id?(data.find(x=>x.id===id)?.createdAt||today()):today()}; if(!g.name||!g.count)return alert("请填写名称和数量"); id?saveLivestock(data.map(x=>x.id===id?g:x)):saveLivestock([...data,g]); closeModal(); renderLivestockPage(); renderProfilePage(); }
 
-    // ===== 观察页 =====
-    function reports(){ return loadJSON("pasture_reports",[]); }
-    function renderObservePage(){ const list=reports().sort((a,b)=>String(b.id).localeCompare(String(a.id))); $("#page-observe").innerHTML=`<button id="observeToggleBtn" class="primary" style="width:100%" onclick="toggleObserveUpload()">➕ 上报新观察</button><section id="observeUpload" class="card observe-upload">${observeForm()}</section><section class="card"><h2 class="section-title">历史观察记录</h2>${list.length?list.map(reportCard).join(""):`<p class="muted">还没有观察记录</p>`}</section>`; }
-    function observeForm(){ const areas=pastures(); return `<div class="field"><label>所属牧场</label><select id="obs-area" style="width:100%;height:46px;border:1px solid var(--line);border-radius:12px">${areas.map(a=>`<option value="${a.id}">${esc(a.name)}</option>`).join("")}</select></div><label class="photo-box" for="obs-photo">📷<br>点击拍照或选择图片</label><input id="obs-photo" type="file" accept="image/*" style="display:none" onchange="previewObserve(event)"><img id="obs-preview" class="preview">${area("文字描述","obs-text","")}<button class="primary" style="width:100%;margin-top:12px" onclick="saveObserve()">保存观察</button>`; }
-    function toggleObserveUpload(){ const box=$("#observeUpload"); box.classList.toggle("open"); $("#observeToggleBtn").textContent = box.classList.contains("open") ? "收起上报表单" : "➕ 上报新观察"; }
-    let observePhoto=""; function previewObserve(e){ const f=e.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=()=>{observePhoto=r.result; $("#obs-preview").src=observePhoto; $("#obs-preview").classList.add("show");}; r.readAsDataURL(f); }
-    function saveObserve(){ const areaId=$("#obs-area").value, a=pastures().find(x=>x.id===areaId); const data=reports(); data.push({id:String(Date.now()),areaId,areaName:a?.name||"",photoBase64:observePhoto,text:$("#obs-text").value.trim(),createdAt:today()}); saveJSON("pasture_reports",data); observePhoto=""; renderObservePage(); }
-    function reportCard(r){ return `<article class="report-card">${r.photoBase64?`<img class="thumb" src="${r.photoBase64}">`:`<div class="thumb"></div>`}<div><b>${esc(r.areaName||"牧场")}</b><p>${esc(r.text||"无文字描述")}</p><p class="muted">${r.createdAt}</p></div></article>`; }
+    // ===== 观察页（Supabase 云端版） =====
+let observeFile = null;
+let cachedReports = [];
 
-    // ===== 我的页 =====
+async function fetchReports() {
+  try {
+    const { data, error } = await sb
+      .from('observations')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    cachedReports = data || [];
+    return cachedReports;
+  } catch (e) {
+    console.error('读取观察记录失败:', e);
+    return [];
+  }
+}
+
+async function renderObservePage() {
+  $("#page-observe").innerHTML = `
+    <button id="observeToggleBtn" class="primary" style="width:100%" onclick="toggleObserveUpload()">➕ 上报新观察</button>
+    <section id="observeUpload" class="card observe-upload">${observeForm()}</section>
+    <section class="card">
+      <h2 class="section-title">历史观察记录</h2>
+      <div id="observeList"><p class="muted">加载中...</p></div>
+    </section>`;
+  const list = await fetchReports();
+  const el = document.getElementById('observeList');
+  if (el) el.innerHTML = list.length ? list.map(reportCard).join("") : `<p class="muted">还没有观察记录</p>`;
+}
+
+function observeForm() {
+  const areas = pastures();
+  return `<div class="field"><label>所属牧场</label><select id="obs-area" style="width:100%;height:46px;border:1px solid var(--line);border-radius:12px">${areas.map(a=>`<option value="${a.id}">${esc(a.name)}</option>`).join("")}</select></div><label class="photo-box" for="obs-photo">📷<br>点击拍照或选择图片</label><input id="obs-photo" type="file" accept="image/*" style="display:none" onchange="previewObserve(event)"><img id="obs-preview" class="preview">${area("文字描述","obs-text","")}<button class="primary" id="obsSaveBtn" style="width:100%;margin-top:12px" onclick="saveObserve()">保存观察</button>`;
+}
+
+function toggleObserveUpload() {
+  const box = $("#observeUpload");
+  box.classList.toggle("open");
+  $("#observeToggleBtn").textContent = box.classList.contains("open") ? "收起上报表单" : "➕ 上报新观察";
+}
+
+function previewObserve(e) {
+  const f = e.target.files[0];
+  if (!f) return;
+  observeFile = f;
+  $("#obs-preview").src = URL.createObjectURL(f);
+  $("#obs-preview").classList.add("show");
+}
+
+async function saveObserve() {
+  const areaId = $("#obs-area").value;
+  const a = pastures().find(x => x.id === areaId);
+  const description = $("#obs-text").value.trim();
+  if (!observeFile && !description) return alert("请上传照片或填写描述");
+
+  const btn = $("#obsSaveBtn");
+  btn.disabled = true;
+  btn.textContent = "上传中...";
+
+  try {
+    let photoUrl = null;
+    if (observeFile) {
+      const fileName = `${Date.now()}-${observeFile.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+      const { error: upErr } = await sb.storage.from('photos').upload(fileName, observeFile);
+      if (upErr) throw new Error(`图片上传失败: ${upErr.message}`);
+      photoUrl = sb.storage.from('photos').getPublicUrl(fileName).data.publicUrl;
+    }
+
+    const { error: insErr } = await sb.from('observations').insert([{
+      photo_url: photoUrl,
+      description: `【${a?.name || '牧场'}】${description || '（无文字描述）'}`,
+      ai_suggestion: '待生成',
+      latitude: 43.85,
+      longitude: 116.05
+    }]);
+    if (insErr) throw new Error(`保存失败: ${insErr.message}`);
+
+    alert("✅ 上报成功！");
+    observeFile = null;
+    renderObservePage();
+  } catch (err) {
+    alert("❌ " + err.message);
+    btn.disabled = false;
+    btn.textContent = "保存观察";
+  }
+}
+
+function reportCard(r) {
+  const date = r.created_at ? new Date(r.created_at).toLocaleDateString('zh-CN') : (r.createdAt || '');
+  const photo = r.photo_url || r.photoBase64;
+  const text = r.description || r.text || '无描述';
+  return `<article class="report-card">${photo?`<img class="thumb" src="${photo}">`:`<div class="thumb"></div>`}<div><p>${esc(text)}</p><p class="muted">${date}</p></div></article>`;
+}// ===== 我的页 =====
     const DEFAULT_PASTURES=[{id:"p1",name:"羊院子",type:"pen",direction:"",distance:0,landmark:"家",groupIds:["1"],greenProgress:0,note:"臊胡圈养，不外出",createdAt:"2026-06-09"},{id:"p2",name:"南牧场",type:"pasture",direction:"south",distance:1.2,landmark:"水井",groupIds:["2","7"],greenProgress:65,note:"每天必去，有水井",createdAt:"2026-06-09"},{id:"p3",name:"东牧场",type:"pasture",direction:"east",distance:null,landmark:"",groupIds:[],greenProgress:0,note:"",createdAt:"2026-06-09"},{id:"p4",name:"北牧场",type:"pasture",direction:"north",distance:null,landmark:"",groupIds:[],greenProgress:0,note:"",createdAt:"2026-06-09"},{id:"p5",name:"西牧场",type:"pasture",direction:"west",distance:null,landmark:"",groupIds:[],greenProgress:0,note:"",createdAt:"2026-06-09"}];
     function pastures(){ return loadJSON("pasture_areas",DEFAULT_PASTURES); }
     function savePastures(v){ saveJSON("pasture_areas",v); }
-    function renderProfilePage(){ const areas=pastures(), ls=livestock(), assigned=new Set(areas.flatMap(a=>a.groupIds)), total=ls.reduce((s,g)=>s+animalCount(g),0), asg=ls.filter(g=>assigned.has(g.id)).reduce((s,g)=>s+animalCount(g),0); $("#page-profile").innerHTML=`<section class="card soft-card" style="margin-top:0"><h2 class="section-title">🏡 欧仁的老家</h2><div class="summary-grid"><div class="summary-item"><span>区域数</span><strong>${areas.length}</strong></div><div class="summary-item"><span>总牲畜</span><strong>${total}</strong></div><div class="summary-item"><span>已分配</span><strong>${asg}</strong></div><div class="summary-item"><span>未分配</span><strong>${total-asg}</strong></div></div></section><section class="card"><h2 class="section-title">牧场地图</h2><div class="profile-map">北 ❄️<br>西 🌄　🏠　🌅 东<br>南 🧭</div></section>${areas.map(a=>areaCard(a,ls)).join("")}<section class="card"><h2 class="section-title">历史记录</h2>${reports().slice(-3).reverse().map(reportCard).join("")||"<p class='muted'>暂无记录</p>"}</section><section class="card settings-row"><h2 class="section-title">⚙️ 设置</h2><button class="secondary" onclick="alert('数据导出功能开发中')">数据导出</button><button class="secondary" onclick="alert('草原AI协作平台')">关于</button></section>`; }
+    function renderProfilePage(){ const areas=pastures(), ls=livestock(), assigned=new Set(areas.flatMap(a=>a.groupIds)), total=ls.reduce((s,g)=>s+animalCount(g),0), asg=ls.filter(g=>assigned.has(g.id)).reduce((s,g)=>s+animalCount(g),0); $("#page-profile").innerHTML=`<section class="card soft-card" style="margin-top:0"><h2 class="section-title">🏡 欧仁的老家</h2><div class="summary-grid"><div class="summary-item"><span>区域数</span><strong>${areas.length}</strong></div><div class="summary-item"><span>总牲畜</span><strong>${total}</strong></div><div class="summary-item"><span>已分配</span><strong>${asg}</strong></div><div class="summary-item"><span>未分配</span><strong>${total-asg}</strong></div></div></section><section class="card"><h2 class="section-title">牧场地图</h2><div class="profile-map">北 ❄️<br>西 🌄　🏠　🌅 东<br>南 🧭</div></section>${areas.map(a=>areaCard(a,ls)).join("")}<section class="card"><h2 class="section-title">历史记录</h2>${cachedReports.slice(0,3).map(reportCard).join("")||"<p class='muted'>暂无记录，去观察页上报一条吧</p>"}</section><section class="card settings-row"><h2 class="section-title">⚙️ 设置</h2><button class="secondary" onclick="alert('数据导出功能开发中')">数据导出</button><button class="secondary" onclick="alert('草原AI协作平台')">关于</button></section>`; }
     function areaCard(a,ls){ const groups=a.groupIds.map(id=>ls.find(g=>g.id===id)).filter(Boolean).map(g=>`${g.name} ${g.count}`).join(" ｜ "); const prog=a.type==="pasture"?`<div class="progress-track" style="margin-top:10px"><div class="progress-fill" style="width:${a.greenProgress}%"></div></div><p class="muted">返青进度 ${a.greenProgress}%</p>`:""; return `<article class="area-card ${a.type==="pen"?"pen":""}"><h2 class="section-title">${a.type==="pen"?"🏚️":"🧭"} ${esc(a.name)}${a.landmark?`（${esc(a.landmark)}）`:""} <span class="muted" style="float:right;font-size:14px">${a.distance==null?"—":a.distance} km</span></h2><p>${groups||"（未设置群组）"}</p>${prog}<div class="area-actions ${a.type==="pen"?"single":""}">${a.type==="pasture"?`<button class="primary" onclick="switchAppTab('observe')">📷 上报观察</button>`:""}<button class="secondary" onclick="openAreaForm('${a.id}')">✏️ 编辑</button></div></article>`; }
     function openAreaForm(id){ const areas=pastures(), a=areas.find(x=>x.id===id), ls=livestock(); openModal(`<h2>编辑区域</h2>${field("区域名称","pa-name",a.name)}<div class="field"><span class="field-title">类型</span><div class="choices">${[["pen","圈舍"],["pasture","牧场"]].map(x=>choice("pa-type",x[0],a.type,x[1])).join("")}</div></div><div class="field"><span class="field-title">方位</span><div class="choices">${[["","无"],["south","南"],["east","东"],["north","北"],["west","西"]].map(x=>choice("pa-dir",x[0],a.direction,x[1])).join("")}</div></div>${field("距离家（公里）","pa-dist",a.distance??"","number")}${field("地标说明","pa-land",a.landmark)}<div class="field"><span class="field-title">关联牲畜群组</span><div class="checkbox-list">${ls.map(g=>`<label><input type="checkbox" value="${g.id}" ${a.groupIds.includes(g.id)?"checked":""}> ${esc(g.name)} ${g.count} ${g.unit}</label>`).join("")}</div></div>${field("返青进度（%）","pa-green",a.greenProgress,"number")}${area("备注","pa-note",a.note)}<div class="modal-actions"><button class="secondary" onclick="closeModal()">取消</button><button class="primary" onclick="saveAreaForm('${id}')">保存</button></div>`); bindChoices(); }
     function saveAreaForm(id){ const areas=pastures(), selectedIds=[...document.querySelectorAll(".checkbox-list input:checked")].map(i=>i.value); const updated=areas.map(a=>a.id===id?{...a,name:$("#pa-name").value.trim(),type:selected("pa-type"),direction:selected("pa-dir"),distance:$("#pa-dist").value===""?null:Number($("#pa-dist").value),landmark:$("#pa-land").value.trim(),groupIds:selectedIds,greenProgress:Number($("#pa-green").value)||0,note:$("#pa-note").value.trim() }:{...a,groupIds:a.groupIds.filter(g=>!selectedIds.includes(g))}); savePastures(updated); closeModal(); renderProfilePage(); }
