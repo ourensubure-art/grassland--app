@@ -642,12 +642,7 @@
         button.textContent = "确认中...";
       }
       try {
-        const isUUID = (v) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
-const safePid = isUUID(pastureId) ? pastureId : (isUUID(PASTURE_ID) ? PASTURE_ID : null);
-
-if (!safePid) {
-  alert('❌ 牧场ID无效，请先选择牧场');
-  return;
+       const safePid = pastureId || PASTURE_ID || null;
 }
 
 const payload = {
@@ -836,14 +831,7 @@ async function saveObserve(){
     }
     
     // UUID 格式校验：不是 UUID 就当 null（避免 "p5" 这种短 id 报错）
-const isUUID = (v) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
-const safePastureId = isUUID(pastureId) ? pastureId : null;
-
-if (!safePastureId) {
-  alert('❌ 牧场ID无效（当前值: ' + pastureId + '），请重新选择牧场');
-  return;
-}
-
+const safePastureId = pastureId || null;
 const { error } = await sb.from('observations').insert({
   pasture_id: safePastureId,
   description: description,
