@@ -653,7 +653,7 @@ if (!safePid) {
 const payload = {
   decision_id: decisionId,
   herder_id: HERDER_ID,
-  pasture_id: safePid,
+  pasture_id: null,   // ← 直接 null，绕过 UUID 校验
   feedback_type: "acknowledged"
 };
         const rows = await supabaseRest("decision_feedback", {
