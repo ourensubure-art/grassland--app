@@ -827,12 +827,16 @@ async function saveObserve(){
       photoUrl = urlData.publicUrl;
     }
     
-    const { error } = await sb.from('observations').insert({
-      pasture_id: pastureId || null,
-      description: description,
-      photo_url: photoUrl,
-      ai_suggestion: '待生成'
-    });
+    // UUID 格式校验：不是 UUID 就当 null（避免 "p5" 这种短 id 报错）
+const isUUID = (v) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+const safePastureId = isUUID(pastureId) ? pastureId : null;
+
+const { error } = await sb.from('observations').insert({
+  pasture_id: safePastureId,
+  description: description,
+  photo_url: photoUrl,
+  ai_suggestion: '待生成'
+});
     
     if(error){ alert('保存失败: ' + error.message); return; }
     
