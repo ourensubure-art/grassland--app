@@ -879,8 +879,65 @@ function reportCard(r, areaMap){
     const DEFAULT_PASTURES=[{id:"p1",name:"羊院子",type:"pen",direction:"",distance:0,landmark:"家",groupIds:["1"],greenProgress:0,note:"臊胡圈养，不外出",createdAt:"2026-06-09"},{id:"p2",name:"南牧场",type:"pasture",direction:"south",distance:1.2,landmark:"水井",groupIds:["2","7"],greenProgress:65,note:"每天必去，有水井",createdAt:"2026-06-09"},{id:"p3",name:"东牧场",type:"pasture",direction:"east",distance:null,landmark:"",groupIds:[],greenProgress:0,note:"",createdAt:"2026-06-09"},{id:"p4",name:"北牧场",type:"pasture",direction:"north",distance:null,landmark:"",groupIds:[],greenProgress:0,note:"",createdAt:"2026-06-09"},{id:"p5",name:"西牧场",type:"pasture",direction:"west",distance:null,landmark:"",groupIds:[],greenProgress:0,note:"",createdAt:"2026-06-09"}];
     function pastures(){ return loadJSON("pasture_areas",DEFAULT_PASTURES); }
     function savePastures(v){ saveJSON("pasture_areas",v); }
-    function renderProfilePage(){ const areas=pastures(), ls=livestock(), assigned=new Set(areas.flatMap(a=>a.groupIds)), total=ls.reduce((s,g)=>s+animalCount(g),0), asg=ls.filter(g=>assigned.has(g.id)).reduce((s,g)=>s+animalCount(g),0); $("#page-profile").innerHTML=`<section class="card soft-card" style="margin-top:0"><h2 class="section-title">🏡 欧仁的老家</h2><div class="summary-grid"><div class="summary-item"><span>区域数</span><strong>${areas.length}</strong></div><div class="summary-item"><span>总牲畜</span><strong>${total}</strong></div><div class="summary-item"><span>已分配</span><strong>${asg}</strong></div><div class="summary-item"><span>未分配</span><strong>${total-asg}</strong></div></div></section><section class="card"><h2 class="section-title">牧场地图</h2><div class="profile-map">北 ❄️<br>西 🌄　🏠　🌅 东<br>南 🧭</div></section>${areas.map(a=>areaCard(a,ls)).join("")}<section class="card"><h2 class="section-title">历史记录</h2>${reports().slice(-3).reverse().map(reportCard).join("")||"<p class='muted'>暂无记录</p>"}</section><section class="card settings-row"><h2 class="section-title">⚙️ 设置</h2><button class="secondary" onclick="alert('数据导出功能开发中')">数据导出</button><button class="secondary" onclick="alert('草原AI协作平台')">关于</button></section>`; }
-    function areaCard(a,ls){ const groups=a.groupIds.map(id=>ls.find(g=>g.id===id)).filter(Boolean).map(g=>`${g.name} ${g.count}`).join(" ｜ "); const prog=a.type==="pasture"?`<div class="progress-track" style="margin-top:10px"><div class="progress-fill" style="width:${a.greenProgress}%"></div></div><p class="muted">返青进度 ${a.greenProgress}%</p>`:""; return `<article class="area-card ${a.type==="pen"?"pen":""}"><h2 class="section-title">${a.type==="pen"?"🏚️":"🧭"} ${esc(a.name)}${a.landmark?`（${esc(a.landmark)}）`:""} <span class="muted" style="float:right;font-size:14px">${a.distance==null?"—":a.distance} km</span></h2><p>${groups||"（未设置群组）"}</p>${prog}<div class="area-actions ${a.type==="pen"?"single":""}">${a.type==="pasture"?`<button class="primary" onclick="switchAppTab('observe')">📷 上报观察</button>`:""}<button class="secondary" onclick="openAreaForm('${a.id}')">✏️ 编辑</button></div></article>`; }
+    function renderProfilePage(){
+  const areas = Array.isArray(pastures()) ? pastures() : [];
+  const ls = Array.isArray(livestock()) ? livestock() : [];
+  const rpts = Array.isArray(reports()) ? reports() : [];
+
+  const assigned = new Set(areas.flatMap(a => Array.isArray(a.groupIds) ? a.groupIds : []));
+  const total = ls.reduce((s,g) => s + (animalCount(g) || 0), 0);
+  const asg = ls.filter(g => assigned.has(g.id)).reduce((s,g) => s + (animalCount(g) || 0), 0);
+
+  $("#page-profile").innerHTML = `
+    <section class="card soft-card" style="margin-top:0">
+      <h2 class="section-title">🏡 欧仁的老家</h2>
+      <div class="summary-grid">
+        <div class="summary-item"><span>区域数</span><strong>${areas.length}</strong></div>
+        <div class="summary-item"><span>总牲畜</span><strong>${total}</strong></div>
+        <div class="summary-item"><span>已分配</span><strong>${asg}</strong></div>
+        <div class="summary-item"><span>未分配</span><strong>${total - asg}</strong></div>
+      </div>
+    </section>
+    <section class="card">
+      <h2 class="section-title">牧场地图</h2>
+      <div class="profile-map">北 ❄️<br>西 🌄　🏠　🌅 东<br>南 🧭</div>
+    </section>
+    ${areas.map(a => areaCard(a, ls)).join("")}
+    <section class="card">
+      <h2 class="section-title">历史记录</h2>
+      ${rpts.slice(-3).reverse().map(reportCard).join("") || "<p class='muted'>暂无记录</p>"}
+    </section>
+    <section class="card settings-row">
+      <h2 class="section-title">⚙️ 设置</h2>
+      <button class="secondary" onclick="alert('数据导出功能开发中')">数据导出</button>
+      <button class="secondary" onclick="alert('草原AI协作平台')">关于</button>
+    </section>`;
+}
+
+function areaCard(a, ls){
+  if (!a) return "";
+  const groupIds = Array.isArray(a.groupIds) ? a.groupIds : [];
+  const groups = groupIds
+    .map(id => ls.find(g => g.id === id))
+    .filter(Boolean)
+    .map(g => `${g.name} ${g.count}`)
+    .join(" ｜ ");
+  const prog = a.type === "pasture"
+    ? `<div class="progress-track" style="margin-top:10px"><div class="progress-fill" style="width:${a.greenProgress || 0}%"></div></div><p class="muted">返青进度 ${a.greenProgress || 0}%</p>`
+    : "";
+  return `<article class="area-card ${a.type === "pen" ? "pen" : ""}">
+    <h2 class="section-title">
+      ${a.type === "pen" ? "🏚️" : "🧭"} ${esc(a.name)}${a.landmark ? `（${esc(a.landmark)}）` : ""}
+      <span class="muted" style="float:right;font-size:14px">${a.distance == null ? "—" : a.distance} km</span>
+    </h2>
+    <p>${groups || "（未设置群组）"}</p>
+    ${prog}
+    <div class="area-actions ${a.type === "pen" ? "single" : ""}">
+      ${a.type === "pasture" ? `<button class="primary" onclick="switchAppTab('observe')">📷 上报观察</button>` : ""}
+      <button class="secondary" onclick="openAreaForm('${a.id}')">✏️ 编辑</button>
+    </div>
+  </article>`;
+}
     function openAreaForm(id){ const areas=pastures(), a=areas.find(x=>x.id===id), ls=livestock(); openModal(`<h2>编辑区域</h2>${field("区域名称","pa-name",a.name)}<div class="field"><span class="field-title">类型</span><div class="choices">${[["pen","圈舍"],["pasture","牧场"]].map(x=>choice("pa-type",x[0],a.type,x[1])).join("")}</div></div><div class="field"><span class="field-title">方位</span><div class="choices">${[["","无"],["south","南"],["east","东"],["north","北"],["west","西"]].map(x=>choice("pa-dir",x[0],a.direction,x[1])).join("")}</div></div>${field("距离家（公里）","pa-dist",a.distance??"","number")}${field("地标说明","pa-land",a.landmark)}<div class="field"><span class="field-title">关联牲畜群组</span><div class="checkbox-list">${ls.map(g=>`<label><input type="checkbox" value="${g.id}" ${a.groupIds.includes(g.id)?"checked":""}> ${esc(g.name)} ${g.count} ${g.unit}</label>`).join("")}</div></div>${field("返青进度（%）","pa-green",a.greenProgress,"number")}${area("备注","pa-note",a.note)}<div class="modal-actions"><button class="secondary" onclick="closeModal()">取消</button><button class="primary" onclick="saveAreaForm('${id}')">保存</button></div>`); bindChoices(); }
     function saveAreaForm(id){ const areas=pastures(), selectedIds=[...document.querySelectorAll(".checkbox-list input:checked")].map(i=>i.value); const updated=areas.map(a=>a.id===id?{...a,name:$("#pa-name").value.trim(),type:selected("pa-type"),direction:selected("pa-dir"),distance:$("#pa-dist").value===""?null:Number($("#pa-dist").value),landmark:$("#pa-land").value.trim(),groupIds:selectedIds,greenProgress:Number($("#pa-green").value)||0,note:$("#pa-note").value.trim() }:{...a,groupIds:a.groupIds.filter(g=>!selectedIds.includes(g))}); savePastures(updated); closeModal(); renderProfilePage(); }
 
