@@ -827,7 +827,7 @@ async function saveObserve(){
       photoUrl = urlData.publicUrl;
     }
     
-    const { error } = await supabase.from('observations').insert({
+    const { error } = await sb.from('observations').insert({
       pasture_id: pastureId || null,
       description: description,
       photo_url: photoUrl,
