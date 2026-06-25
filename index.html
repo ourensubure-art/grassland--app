@@ -859,7 +859,14 @@ function reportCard(r, areaMap){
   return `<article class="report-card">${r.photo_url?`<img class="thumb" src="${r.photo_url}">`:`<div class="thumb"></div>`}<div><b>${esc(areaName)}</b><p>${esc(r.description||"无文字描述")}</p><p class="muted">${dateStr}</p></div></article>`;
 }
     // ===== 我的页 =====
-    const DEFAULT_PASTURES=[{id:"p1",name:"羊院子",type:"pen",direction:"",distance:0,landmark:"家",groupIds:["1"],greenProgress:0,note:"臊胡圈养，不外出",createdAt:"2026-06-09"},{id:"p2",name:"南牧场",type:"pasture",direction:"south",distance:1.2,landmark:"水井",groupIds:["2","7"],greenProgress:65,note:"每天必去，有水井",createdAt:"2026-06-09"},{id:"p3",name:"东牧场",type:"pasture",direction:"east",distance:null,landmark:"",groupIds:[],greenProgress:0,note:"",createdAt:"2026-06-09"},{id:"p4",name:"北牧场",type:"pasture",direction:"north",distance:null,landmark:"",groupIds:[],greenProgress:0,note:"",createdAt:"2026-06-09"},{id:"p5",name:"西牧场",type:"pasture",direction:"west",distance:null,landmark:"",groupIds:[],greenProgress:0,note:"",createdAt:"2026-06-09"}];
+    const DEFAULT_PASTURES=[
+  {id:"aaaaaaaa-0001-0000-0000-000000000001",name:"家（核心区）",type:"pen",direction:"",distance:0,landmark:"家",groupIds:["1"],greenProgress:0,note:"臊胡圈养，不外出",createdAt:"2026-06-09"},
+  {id:"aaaaaaaa-0002-0000-0000-000000000002",name:"南牧场",type:"pasture",direction:"south",distance:1.2,landmark:"水井",groupIds:["2","7"],greenProgress:65,note:"每天必去，有水井",createdAt:"2026-06-09"},
+  {id:"aaaaaaaa-0003-0000-0000-000000000003",name:"东牧场",type:"pasture",direction:"east",distance:null,landmark:"",groupIds:[],greenProgress:0,note:"",createdAt:"2026-06-09"},
+  {id:"aaaaaaaa-0004-0000-0000-000000000004",name:"北牧场",type:"pasture",direction:"north",distance:null,landmark:"",groupIds:[],greenProgress:0,note:"",createdAt:"2026-06-09"},
+  {id:"aaaaaaaa-0005-0000-0000-000000000005",name:"西牧场",type:"pasture",direction:"west",distance:null,landmark:"",groupIds:[],greenProgress:0,note:"",createdAt:"2026-06-09"}
+];
+function pastures(){ return loadJSON("pasture_areas",DEFAULT_PASTURES); }
     function pastures(){ return loadJSON("pasture_areas",DEFAULT_PASTURES); }
     function savePastures(v){ saveJSON("pasture_areas",v); }
     function renderProfilePage(){
