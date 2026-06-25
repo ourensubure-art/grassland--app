@@ -755,14 +755,109 @@
     function saveLivestockForm(id){ const data=livestock(), g={id:id||String(Date.now()),category:selected("lg-cat"),name:$("#lg-name").value.trim(),count:Number($("#lg-count").value),unit:selected("lg-unit"),health:selected("lg-health"),note:$("#lg-note").value.trim(),createdAt:id?(data.find(x=>x.id===id)?.createdAt||today()):today()}; if(!g.name||!g.count)return alert("请填写名称和数量"); id?saveLivestock(data.map(x=>x.id===id?g:x)):saveLivestock([...data,g]); closeModal(); renderLivestockPage(); renderProfilePage(); }
 
     // ===== 观察页 =====
-    function reports(){ return loadJSON("pasture_reports",[]); }
-    function renderObservePage(){ const list=reports().sort((a,b)=>String(b.id).localeCompare(String(a.id))); $("#page-observe").innerHTML=`<button id="observeToggleBtn" class="primary" style="width:100%" onclick="toggleObserveUpload()">➕ 上报新观察</button><section id="observeUpload" class="card observe-upload">${observeForm()}</section><section class="card"><h2 class="section-title">历史观察记录</h2>${list.length?list.map(reportCard).join(""):`<p class="muted">还没有观察记录</p>`}</section>`; }
-    function observeForm(){ const areas=pastures(); return `<div class="field"><label>所属牧场</label><select id="obs-area" style="width:100%;height:46px;border:1px solid var(--line);border-radius:12px">${areas.map(a=>`<option value="${a.id}">${esc(a.name)}</option>`).join("")}</select></div><label class="photo-box" for="obs-photo">📷<br>点击拍照或选择图片</label><input id="obs-photo" type="file" accept="image/*" style="display:none" onchange="previewObserve(event)"><img id="obs-preview" class="preview">${area("文字描述","obs-text","")}<button class="primary" style="width:100%;margin-top:12px" onclick="saveObserve()">保存观察</button>`; }
-    function toggleObserveUpload(){ const box=$("#observeUpload"); box.classList.toggle("open"); $("#observeToggleBtn").textContent = box.classList.contains("open") ? "收起上报表单" : "➕ 上报新观察"; }
-    let observePhoto=""; function previewObserve(e){ const f=e.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=()=>{observePhoto=r.result; $("#obs-preview").src=observePhoto; $("#obs-preview").classList.add("show");}; r.readAsDataURL(f); }
-    function saveObserve(){ const areaId=$("#obs-area").value, a=pastures().find(x=>x.id===areaId); const data=reports(); data.push({id:String(Date.now()),areaId,areaName:a?.name||"",photoBase64:observePhoto,text:$("#obs-text").value.trim(),createdAt:today()}); saveJSON("pasture_reports",data); observePhoto=""; renderObservePage(); }
-    function reportCard(r){ return `<article class="report-card">${r.photoBase64?`<img class="thumb" src="${r.photoBase64}">`:`<div class="thumb"></div>`}<div><b>${esc(r.areaName||"牧场")}</b><p>${esc(r.text||"无文字描述")}</p><p class="muted">${r.createdAt}</p></div></article>`; }
+   // ===== 观察页（Supabase 版）=====
+async function reports(){
+  const { data, error } = await supabase
+    .from('observations')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if(error){ console.error('读取观察记录失败:', error); return []; }
+  return data || [];
+}
 
+async function renderObservePage(){
+  const list = await reports();
+  const areas = pastures();
+  const areaMap = {};
+  areas.forEach(a => areaMap[a.id] = a.name);
+  
+  $("#page-observe").innerHTML = `
+    <button id="observeToggleBtn" class="primary" style="width:100%" onclick="toggleObserveUpload()">➕ 上报新观察</button>
+    <section id="observeUpload" class="card observe-upload">${observeForm()}</section>
+    <section class="card">
+      <h2 class="section-title">历史观察记录</h2>
+      ${list.length ? list.map(r => reportCard(r, areaMap)).join("") : `<p class="muted">还没有观察记录</p>`}
+    </section>`;
+}
+
+function observeForm(){
+  const areas = pastures();
+  return `<div class="field"><label>所属牧场</label><select id="obs-area" style="width:100%;height:46px;border:1px solid var(--line);border-radius:12px">${areas.map(a=>`<option value="${a.id}">${esc(a.name)}</option>`).join("")}</select></div><label class="photo-box" for="obs-photo">📷<br>点击拍照或选择图片</label><input id="obs-photo" type="file" accept="image/*" style="display:none" onchange="previewObserve(event)"><img id="obs-preview" class="preview">${area("文字描述","obs-text","")}<button class="primary" style="width:100%;margin-top:12px" onclick="saveObserve()">保存观察</button>`;
+}
+
+function toggleObserveUpload(){
+  const box = $("#observeUpload");
+  box.classList.toggle("open");
+  $("#observeToggleBtn").textContent = box.classList.contains("open") ? "收起上报表单" : "➕ 上报新观察";
+}
+
+let observePhotoFile = null;
+function previewObserve(e){
+  const f = e.target.files[0];
+  if(!f) return;
+  observePhotoFile = f;
+  const r = new FileReader();
+  r.onload = () => {
+    $("#obs-preview").src = r.result;
+    $("#obs-preview").classList.add("show");
+  };
+  r.readAsDataURL(f);
+}
+
+async function saveObserve(){
+  const btn = event?.target;
+  if(btn){ btn.disabled = true; btn.textContent = '保存中...'; }
+  
+  try {
+    const pastureId = $("#obs-area").value;
+    const description = $("#obs-text").value.trim();
+    
+    let photoUrl = "";
+    if(observePhotoFile){
+      const ext = (observePhotoFile.name.split('.').pop() || 'jpg').toLowerCase();
+      const filename = `${Date.now()}-${Math.random().toString(36).slice(2,8)}.${ext}`;
+      
+      const { error: upErr } = await supabase.storage
+        .from('photos')
+        .upload(filename, observePhotoFile, { contentType: observePhotoFile.type });
+      
+      if(upErr){ alert('照片上传失败: ' + upErr.message); return; }
+      
+      const { data: urlData } = supabase.storage.from('photos').getPublicUrl(filename);
+      photoUrl = urlData.publicUrl;
+    }
+    
+    const { error } = await supabase.from('observations').insert({
+      pasture_id: pastureId || null,
+      description: description,
+      photo_url: photoUrl,
+      ai_suggestion: '待生成'
+    });
+    
+    if(error){ alert('保存失败: ' + error.message); return; }
+    
+    // 重置表单
+    observePhotoFile = null;
+    $("#obs-text").value = "";
+    $("#obs-preview").classList.remove("show");
+    $("#obs-preview").src = "";
+    const box = $("#observeUpload");
+    if(box && box.classList.contains("open")){
+      box.classList.remove("open");
+      $("#observeToggleBtn").textContent = "➕ 上报新观察";
+    }
+    
+    await renderObservePage();
+  } finally {
+    if(btn){ btn.disabled = false; btn.textContent = '保存观察'; }
+  }
+}
+
+function reportCard(r, areaMap){
+  const areaName = (areaMap && areaMap[r.pasture_id]) || "牧场";
+  const dateStr = r.created_at ? new Date(r.created_at).toLocaleString('zh-CN', {hour12:false}) : '';
+  return `<article class="report-card">${r.photo_url?`<img class="thumb" src="${r.photo_url}">`:`<div class="thumb"></div>`}<div><b>${esc(areaName)}</b><p>${esc(r.description||"无文字描述")}</p><p class="muted">${dateStr}</p></div></article>`;
+}
     // ===== 我的页 =====
     const DEFAULT_PASTURES=[{id:"p1",name:"羊院子",type:"pen",direction:"",distance:0,landmark:"家",groupIds:["1"],greenProgress:0,note:"臊胡圈养，不外出",createdAt:"2026-06-09"},{id:"p2",name:"南牧场",type:"pasture",direction:"south",distance:1.2,landmark:"水井",groupIds:["2","7"],greenProgress:65,note:"每天必去，有水井",createdAt:"2026-06-09"},{id:"p3",name:"东牧场",type:"pasture",direction:"east",distance:null,landmark:"",groupIds:[],greenProgress:0,note:"",createdAt:"2026-06-09"},{id:"p4",name:"北牧场",type:"pasture",direction:"north",distance:null,landmark:"",groupIds:[],greenProgress:0,note:"",createdAt:"2026-06-09"},{id:"p5",name:"西牧场",type:"pasture",direction:"west",distance:null,landmark:"",groupIds:[],greenProgress:0,note:"",createdAt:"2026-06-09"}];
     function pastures(){ return loadJSON("pasture_areas",DEFAULT_PASTURES); }
