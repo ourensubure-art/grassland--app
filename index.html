@@ -757,7 +757,7 @@
     // ===== 观察页 =====
    // ===== 观察页（Supabase 版）=====
 async function reports(){
-  const { data, error } = await supabase
+  const { data, error } = await sb
     .from('observations')
     .select('*')
     .order('created_at', { ascending: false });
