@@ -642,18 +642,10 @@
         button.textContent = "确认中...";
       }
       try {
-        const isUUID = (v) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
-const safePid = isUUID(pastureId) ? pastureId : (isUUID(PASTURE_ID) ? PASTURE_ID : null);
-
-if (!safePid) {
-  alert('❌ 牧场ID无效，请先选择牧场');
-  return;
-}
-
-const payload = {
+       const payload = {
   decision_id: decisionId,
   herder_id: HERDER_ID,
-  pasture_id: null,   // ← 直接 null，绕过 UUID 校验
+  pasture_id: pastureId || PASTURE_ID,
   feedback_type: "acknowledged"
 };
         const rows = await supabaseRest("decision_feedback", {
