@@ -432,7 +432,7 @@
     /** @typedef {{id:string,decision_id:string,herder_id:string,pasture_id:string,feedback_type:"acknowledged",created_at:string}} DecisionFeedback */
     const HERDER_CONFIG = window.HERDER_CONFIG || {};
     const HERDER_ID = HERDER_CONFIG.HERDER_ID || "herder_demo";
-    const PASTURE_ID = HERDER_CONFIG.PASTURE_ID || "pasture_001";
+    const PASTURE_ID = HERDER_CONFIG.PASTURE_ID || null;
     const SUPABASE_URL = HERDER_CONFIG.SUPABASE_URL || "";
     const SUPABASE_ANON_KEY = HERDER_CONFIG.SUPABASE_ANON_KEY || "";
     let taskRoute = { mode: "list", decisionId: "" };
@@ -642,12 +642,20 @@
         button.textContent = "确认中...";
       }
       try {
-        const payload = {
-          decision_id: decisionId,
-          herder_id: HERDER_ID,
-          pasture_id: pastureId || PASTURE_ID,
-          feedback_type: "acknowledged"
-        };
+        const isUUID = (v) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+const safePid = isUUID(pastureId) ? pastureId : (isUUID(PASTURE_ID) ? PASTURE_ID : null);
+
+if (!safePid) {
+  alert('❌ 牧场ID无效，请先选择牧场');
+  return;
+}
+
+const payload = {
+  decision_id: decisionId,
+  herder_id: HERDER_ID,
+  pasture_id: safePid,
+  feedback_type: "acknowledged"
+};
         const rows = await supabaseRest("decision_feedback", {
           method: "POST",
           body: JSON.stringify(payload),
@@ -830,6 +838,11 @@ async function saveObserve(){
     // UUID 格式校验：不是 UUID 就当 null（避免 "p5" 这种短 id 报错）
 const isUUID = (v) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
 const safePastureId = isUUID(pastureId) ? pastureId : null;
+
+if (!safePastureId) {
+  alert('❌ 牧场ID无效（当前值: ' + pastureId + '），请重新选择牧场');
+  return;
+}
 
 const { error } = await sb.from('observations').insert({
   pasture_id: safePastureId,
