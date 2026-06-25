@@ -240,11 +240,15 @@
   </nav>
 
   <div id="appModal" class="modal-backdrop"></div>
-
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./herder-config.js"></script>
   <script>
     const QWEATHER_HOST = "me6vhh6cn3.re.qweatherapi.com";
     const QWEATHER_KEY = "d620828c05bd441c9c516a5badb85866";
+    const sb = window.supabase.createClient(
+  window.HERDER_CONFIG.SUPABASE_URL,
+  window.HERDER_CONFIG.SUPABASE_ANON_KEY
+);
     const $ = (sel) => document.querySelector(sel);
     const pages = ["weather", "tasks", "livestock", "observe", "profile"];
     const modal = $("#appModal");
